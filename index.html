@@ -388,7 +388,7 @@ select {
     </div>
     <div class="btn-row">
       <button class="btn-sec" onclick="esportaCSV()">⬇️ CSV</button>
-      <button class="btn-sec" onclick="sincronizzaPendenti()">☁️ Sincronizza</button>
+      <button class="btn-sec" onclick="risincronizzaTutto()">🔄 Sincronizza tutto</button>
     </div>
   </div>
 
@@ -692,7 +692,7 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* ---- SINCRONIZZA TUTTO (anti-duplicati: il controllo è su Google) ---- */
+/* ---- SINCRONIZZA TUTTO (anti-duplicati gestiti da Google) ---- */
 function risincronizzaTutto() {
   var scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
   if (!scriptUrl) { showToast('Configura prima Google Sheets', 'error'); return; }
