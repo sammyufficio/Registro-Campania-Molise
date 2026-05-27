@@ -608,19 +608,14 @@ function salvaRecord() {
 
   var scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
   if (scriptUrl) {
-    fetch(scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    }).then(function(){
-      record.synced = true;
+    inviaASheets(scriptUrl, record, function(ok) {
+      if (ok) {
+        record.synced = true;
+        showToast('✅ Salvato e sincronizzato!', 'success');
+      } else {
+        showToast('💾 Salvato, sync fallita', '');
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-      showToast('✅ Salvato e sincronizzato!', 'success');
-      resetForm(btn);
-      renderRecords();
-    }).catch(function(){
-      showToast('💾 Salvato, sync fallita', '');
       resetForm(btn);
       renderRecords();
     });
@@ -629,6 +624,25 @@ function salvaRecord() {
     resetForm(btn);
     renderRecords();
   }
+}
+
+/* ---- INVIO A GOOGLE SHEETS (senza no-cors) ---- */
+function inviaASheets(scriptUrl, record, callback) {
+  /* Usiamo XMLHttpRequest che non ha la restrizione no-cors
+     e inviamo come form-encoded così Apps Script riceve
+     i dati nel parametro e.parameter.data                  */
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', scriptUrl, true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.timeout = 15000;
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      callback(xhr.status >= 200 && xhr.status < 400);
+    }
+  };
+  xhr.ontimeout = function() { callback(false); };
+  xhr.onerror   = function() { callback(false); };
+  xhr.send('data=' + encodeURIComponent(JSON.stringify(record)));
 }
 
 function resetForm(btn) {
@@ -691,24 +705,20 @@ function sincronizzaPendenti() {
   var pendenti = records.filter(function(r){ return !r.synced; });
   if (pendenti.length === 0) { showToast('Tutto già sincronizzato ✅', 'success'); return; }
   showToast('⏳ Sincronizzazione in corso...', '');
-  var ok = 0;
-  var tot = pendenti.length;
+  var completati = 0;
+  var riusciti   = 0;
+  var tot        = pendenti.length;
   pendenti.forEach(function(r){
-    fetch(scriptUrl, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(r)
-    }).then(function(){
-      r.synced = true; ok++;
-      if (ok === tot) {
+    inviaASheets(scriptUrl, r, function(ok) {
+      if (ok) { r.synced = true; riusciti++; }
+      completati++;
+      if (completati === tot) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-        showToast('☁️ Sincronizzati ' + ok + '/' + tot, 'success');
-        renderRecords();
-      }
-    }).catch(function(){
-      if (ok + 1 === tot) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-        showToast('⚠️ Sincronizzati parzialmente', '');
+        if (riusciti === tot) {
+          showToast('☁️ Sincronizzati ' + riusciti + '/' + tot, 'success');
+        } else {
+          showToast('⚠️ Sincronizzati ' + riusciti + '/' + tot, '');
+        }
         renderRecords();
       }
     });
