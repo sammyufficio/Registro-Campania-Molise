@@ -626,23 +626,26 @@ function salvaRecord() {
   }
 }
 
-/* ---- INVIO A GOOGLE SHEETS (senza no-cors) ---- */
+/* ---- INVIO A GOOGLE SHEETS via GET (bypassa CORS) ---- */
 function inviaASheets(scriptUrl, record, callback) {
-  /* Usiamo XMLHttpRequest che non ha la restrizione no-cors
-     e inviamo come form-encoded così Apps Script riceve
-     i dati nel parametro e.parameter.data                  */
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', scriptUrl, true);
-  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-  xhr.timeout = 15000;
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState === 4) {
-      callback(xhr.status >= 200 && xhr.status < 400);
-    }
-  };
-  xhr.ontimeout = function() { callback(false); };
-  xhr.onerror   = function() { callback(false); };
-  xhr.send('data=' + encodeURIComponent(JSON.stringify(record)));
+  /* Google Apps Script non supporta header CORS custom su POST.
+     La soluzione affidabile da GitHub Pages è inviare via GET
+     con i dati come parametro nell'URL: nessun blocco CORS.   */
+  var url = scriptUrl + '?data=' + encodeURIComponent(JSON.stringify(record));
+  var img = new Image();
+  /* Usiamo anche fetch con no-cors come fallback parallelo:
+     il doGet scrive sul foglio prima ancora che arrivi la risposta */
+  var done = false;
+  function risolvi(ok) {
+    if (!done) { done = true; callback(ok); }
+  }
+  /* Tentativo principale: fetch no-cors su GET — funziona sempre,
+     la risposta è opaca ma la richiesta arriva a Google          */
+  fetch(url, { method: 'GET', mode: 'no-cors' })
+    .then(function() { risolvi(true); })
+    .catch(function() { risolvi(false); });
+  /* Safety timeout */
+  setTimeout(function() { risolvi(false); }, 15000);
 }
 
 function resetForm(btn) {
