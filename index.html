@@ -626,25 +626,16 @@ function salvaRecord() {
   }
 }
 
-/* ---- INVIO A GOOGLE SHEETS via GET (bypassa CORS) ---- */
+/* ---- INVIO A GOOGLE SHEETS via GET no-cors ---- */
 function inviaASheets(scriptUrl, record, callback) {
-  /* Google Apps Script non supporta header CORS custom su POST.
-     La soluzione affidabile da GitHub Pages è inviare via GET
-     con i dati come parametro nell'URL: nessun blocco CORS.   */
   var url = scriptUrl + '?data=' + encodeURIComponent(JSON.stringify(record));
-  var img = new Image();
-  /* Usiamo anche fetch con no-cors come fallback parallelo:
-     il doGet scrive sul foglio prima ancora che arrivi la risposta */
   var done = false;
   function risolvi(ok) {
     if (!done) { done = true; callback(ok); }
   }
-  /* Tentativo principale: fetch no-cors su GET — funziona sempre,
-     la risposta è opaca ma la richiesta arriva a Google          */
   fetch(url, { method: 'GET', mode: 'no-cors' })
     .then(function() { risolvi(true); })
     .catch(function() { risolvi(false); });
-  /* Safety timeout */
   setTimeout(function() { risolvi(false); }, 15000);
 }
 
@@ -701,17 +692,16 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* ---- SINCRONIZZA PENDENTI ---- */
-function sincronizzaPendenti() {
+/* ---- SINCRONIZZA TUTTO (anti-duplicati: il controllo è su Google) ---- */
+function risincronizzaTutto() {
   var scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
   if (!scriptUrl) { showToast('Configura prima Google Sheets', 'error'); return; }
-  var pendenti = records.filter(function(r){ return !r.synced; });
-  if (pendenti.length === 0) { showToast('Tutto già sincronizzato ✅', 'success'); return; }
+  if (records.length === 0) { showToast('Nessun intervento da sincronizzare', 'error'); return; }
   showToast('⏳ Sincronizzazione in corso...', '');
   var completati = 0;
   var riusciti   = 0;
-  var tot        = pendenti.length;
-  pendenti.forEach(function(r){
+  var tot        = records.length;
+  records.forEach(function(r){
     inviaASheets(scriptUrl, r, function(ok) {
       if (ok) { r.synced = true; riusciti++; }
       completati++;
