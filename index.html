@@ -629,17 +629,54 @@ function salvaRecord() {
   }
 }
 
-/* ---- INVIO A GOOGLE SHEETS via GET no-cors ---- */
+/* ---- INVIO A GOOGLE SHEETS via GET no-cors ----
+   Invia una riga per ogni punto fisso presente nel record.
+   Tutti i campi comuni (data, ora, sito, tipo, note) vengono
+   ripetuti su ogni riga; cambia solo nome/tipo del punto fisso.
+   Usa record.id + indice come chiave anti-duplicati lato Sheets.
+---------------------------------------------------------------- */
 function inviaASheets(scriptUrl, record, callback) {
-  var url = scriptUrl + '?data=' + encodeURIComponent(JSON.stringify(record));
-  var done = false;
+  var punti = (record.punti && record.punti.length > 0)
+    ? record.punti
+    : [{ nome: '', tipo: 'N/D' }];
+
+  var tot       = punti.length;
+  var completati = 0;
+  var tuttiOk   = true;
+  var done      = false;
+
   function risolvi(ok) {
-    if (!done) { done = true; callback(ok); }
+    if (!ok) tuttiOk = false;
+    completati++;
+    if (completati === tot && !done) {
+      done = true;
+      callback(tuttiOk);
+    }
   }
-  fetch(url, { method: 'GET', mode: 'no-cors' })
-    .then(function() { risolvi(true); })
-    .catch(function() { risolvi(false); });
-  setTimeout(function() { risolvi(false); }, 15000);
+
+  punti.forEach(function(punto, idx) {
+    var riga = {
+      id:          record.id + '_' + idx,   // chiave univoca anti-dup
+      data:        record.data,
+      ora:         record.ora,
+      sito:        record.sito,
+      intervento:  record.intervento,
+      puntoNome:   punto.nome,
+      puntoTipo:   punto.tipo,
+      note:        idx === 0 ? record.note : '', // note solo sulla prima riga
+      totPunti:    tot
+    };
+
+    var url = scriptUrl + '?data=' + encodeURIComponent(JSON.stringify(riga));
+    var rowDone = false;
+    function rowRisolvi(ok) {
+      if (!rowDone) { rowDone = true; risolvi(ok); }
+    }
+    fetch(url, { method: 'GET', mode: 'no-cors' })
+      .then(function() { rowRisolvi(true); })
+      .catch(function() { rowRisolvi(false); });
+    setTimeout(function() { rowRisolvi(false); }, 15000);
+  });
 }
 
 function resetForm(btn) {
