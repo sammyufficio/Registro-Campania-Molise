@@ -280,6 +280,8 @@ select {
   touch-action: manipulation; transition: background 0.12s;
 }
 .btn-sec:active { background: var(--blue-light); }
+.btn-sec.btn-danger { border-color: #c62828; color: #c62828; }
+.btn-sec.btn-danger:active { background: #ffebee; }
 
 /* SETTINGS */
 .settings-toggle { text-align: center; padding: 10px 0 4px; }
@@ -391,6 +393,9 @@ select {
     <div class="btn-row">
       <button class="btn-sec" onclick="esportaCSV()">⬇️ CSV</button>
       <button class="btn-sec" onclick="risincronizzaTutto()">🔄 Sincronizza tutto</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-sec btn-danger" onclick="pulisciCronologia()">🗑️ Pulisci cronologia</button>
     </div>
   </div>
 
@@ -756,6 +761,32 @@ function risincronizzaTutto() {
       }
     });
   });
+}
+
+/* ---- PULISCI CRONOLOGIA LOCALE ----
+   Cancella SOLO lo storico salvato in questo telefono/browser
+   (localStorage). NON invia nessuna richiesta al Google Script,
+   quindi il Google Sheet e i dati già sincronizzati NON vengono
+   toccati in alcun modo.
+---------------------------------------------------------------- */
+function pulisciCronologia() {
+  if (records.length === 0) { showToast('Cronologia già vuota', ''); return; }
+
+  var nonSync = records.filter(function(r){ return !r.synced; }).length;
+  var msg = 'Vuoi davvero cancellare tutta la cronologia da questo telefono?\n\n' +
+            'Verranno rimossi ' + records.length + ' interventi dallo storico locale.\n' +
+            'Il Google Sheet NON verrà modificato.';
+  if (nonSync > 0) {
+    msg += '\n\n⚠️ Attenzione: ' + nonSync + ' intervento/i risultano NON ancora sincronizzati. ' +
+           'Se li cancelli ora e non sono su Google Sheets, andranno persi.';
+  }
+
+  if (!confirm(msg)) return;
+
+  records = [];
+  localStorage.removeItem(STORAGE_KEY);
+  renderRecords();
+  showToast('🗑️ Cronologia locale svuotata', 'success');
 }
 
 /* ---- CSV ---- */
